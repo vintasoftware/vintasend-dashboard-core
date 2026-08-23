@@ -32,7 +32,7 @@
     "test:watch": "vitest",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "prepublishOnly": "npm run build",
+    "prepare": "npm run build",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
