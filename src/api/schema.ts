@@ -88,6 +88,7 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
             };
         };
         put?: never;
@@ -111,8 +112,10 @@ export interface paths {
          *     `subjectTemplate`, `contextName`) are matched with the most precise
          *     lookup the backend supports: case-insensitive `includes` when available,
          *     otherwise a case-insensitive exact match, otherwise a plain equality
-         *     match. Ordering defaults to `createdAt desc`, and is dropped when the
-         *     backend reports it cannot order by the requested field.
+         *     match. The template-version filters match exactly and never match a
+         *     notification whose version is null. Ordering defaults to `createdAt desc`,
+         *     and is dropped when the backend reports it cannot order by the requested
+         *     field.
          */
         get: {
             parameters: {
@@ -151,6 +154,7 @@ export interface paths {
                 200: components["responses"]["NotificationPage"];
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
             };
         };
         put?: never;
@@ -188,6 +192,7 @@ export interface paths {
                 200: components["responses"]["NotificationPage"];
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
             };
         };
         put?: never;
@@ -225,6 +230,7 @@ export interface paths {
                 200: components["responses"]["NotificationPage"];
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
             };
         };
         put?: never;
@@ -262,6 +268,7 @@ export interface paths {
                 200: components["responses"]["NotificationPage"];
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
             };
         };
         put?: never;
@@ -306,6 +313,7 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
             };
         };
@@ -355,6 +363,7 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
                 /**
                  * @description No commit SHA is available for this notification, so its templates
@@ -440,6 +449,7 @@ export interface paths {
                 };
                 400: components["responses"]["BadRequest"];
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
                 /**
                  * @description The notification cannot be resent — it does not exist, is a one-off
                  *     notification, or is scheduled for the future (`CONFLICT`).
@@ -496,6 +506,7 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
                 /** @description The notification is not in `PENDING_SEND` status (`CONFLICT`). */
                 409: {
@@ -599,8 +610,9 @@ export interface components {
             page: number;
             pageSize: number;
             /**
-             * @description True when the page came back full, meaning another page may exist.
-             *     Backends are not required to report a total count.
+             * @description True when the next page has at least one row. Backends are not
+             *     required to report a total count, so after a full page the server
+             *     reads the one row that would come next.
              */
             hasMore: boolean;
         };
@@ -614,9 +626,12 @@ export interface components {
         ErrorResponse: {
             error: {
                 /** @enum {string} */
-                code: "BAD_REQUEST" | "UNAUTHORIZED" | "NOT_FOUND" | "CONFLICT" | "PREVIEW_UNAVAILABLE" | "UPSTREAM_ERROR" | "INTERNAL_ERROR";
+                code: "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "PREVIEW_UNAVAILABLE" | "UPSTREAM_ERROR" | "INTERNAL_ERROR";
                 message: string;
-                /** @description Optional machine-readable context, such as field issues. */
+                /**
+                 * @description Optional machine-readable context. Every 400 carries `issues`, a
+                 *     list of `{ path, message }`, and may carry other keys beside it.
+                 */
                 details?: unknown;
             };
         };
@@ -631,7 +646,10 @@ export interface components {
                 "application/json": components["schemas"]["PaginatedNotifications"];
             };
         };
-        /** @description The request failed validation (`BAD_REQUEST`). */
+        /**
+         * @description The request failed validation (`BAD_REQUEST`). `details.issues` lists
+         *     what was wrong.
+         */
         BadRequest: {
             headers: {
                 [name: string]: unknown;
@@ -640,8 +658,24 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The API key is missing or wrong (`UNAUTHORIZED`). */
+        /**
+         * @description No valid credential was presented — a missing or wrong API key, or
+         *     whatever the host's authentication refuses (`UNAUTHORIZED`).
+         */
         Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /**
+         * @description The caller is authenticated and not allowed to do this (`FORBIDDEN`).
+         *     Answered by a host's own authentication; the API key never produces
+         *     it. Unlike a 401, it is not a reason to sign in again.
+         */
+        Forbidden: {
             headers: {
                 [name: string]: unknown;
             };
