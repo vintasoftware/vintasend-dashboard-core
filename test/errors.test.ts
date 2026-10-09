@@ -21,6 +21,12 @@ describe('isApiErrorResponse', () => {
     ).toBe(true);
   });
 
+  it('accepts a 403 from a host that refuses a signed-in caller', () => {
+    expect(isApiErrorResponse({ error: { code: 'FORBIDDEN', message: 'Not allowed.' } })).toBe(
+      true,
+    );
+  });
+
   it('rejects an unknown error code', () => {
     expect(isApiErrorResponse({ error: { code: 'TEAPOT', message: 'no' } })).toBe(false);
   });

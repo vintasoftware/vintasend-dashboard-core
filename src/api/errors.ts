@@ -10,15 +10,31 @@
 
 import type { ApiErrorCode, ErrorResponse } from './types.js';
 
-const API_ERROR_CODES: readonly ApiErrorCode[] = [
+/**
+ * Every code the contract defines. `FORBIDDEN` means the caller is signed in
+ * and not allowed, so it is not a reason to send them back to a sign-in page
+ * the way `UNAUTHORIZED` is.
+ */
+const API_ERROR_CODES = [
   'BAD_REQUEST',
   'UNAUTHORIZED',
+  'FORBIDDEN',
   'NOT_FOUND',
   'CONFLICT',
   'PREVIEW_UNAVAILABLE',
   'UPSTREAM_ERROR',
   'INTERNAL_ERROR',
-];
+] as const satisfies readonly ApiErrorCode[];
+
+/**
+ * Compile-time proof that the list above covers the contract. A code added to
+ * `openapi.yaml` fails this until it is listed — and an unlisted code would make
+ * `isApiErrorResponse` reject a real answer from the API.
+ */
+type AssertNever<T extends never> = T;
+export type UncoveredErrorCode = AssertNever<
+  Exclude<ApiErrorCode, (typeof API_ERROR_CODES)[number]>
+>;
 
 /**
  * True when `value` is the API's error envelope. Use it to narrow the `error`
