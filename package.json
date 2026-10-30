@@ -29,7 +29,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "generate:api": "openapi-typescript ../vintasend-api/openapi.yaml -o src/api/schema.ts",
+    "openapi-typescript": "npm exec --yes --package=openapi-typescript@7.13.0 --package=typescript@5.9.3 -- openapi-typescript",
+    "generate:api": "npm run openapi-typescript -- ../vintasend-api/openapi.yaml -o src/api/schema.ts",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -54,18 +55,17 @@
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.10",
-    "@tanstack/react-query": "^5.102.0",
-    "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.2.0",
-    "jsdom": "^28.0.0",
-    "next": "^16.1.6",
-    "openapi-typescript": "^7.13.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18",
-    "@vitest/coverage-v8": "^4.0.18"
+    "@biomejs/biome": "^2.6.4",
+    "@tanstack/react-query": "^5.105.0",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "jsdom": "^30.1.3",
+    "next": "^16.4.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "@vitest/coverage-v8": "^5.0.5"
   },
   "engines": {
     "node": ">=20"

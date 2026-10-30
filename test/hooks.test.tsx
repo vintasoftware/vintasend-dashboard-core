@@ -135,7 +135,7 @@ function setup(overrides: Record<string, (url: URL) => { status?: number; body: 
 }
 
 function queryOnlyWrapper(queryClient: QueryClient) {
-  return function Wrapper({ children }: { children: ReactNode }) {
+  return function wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
