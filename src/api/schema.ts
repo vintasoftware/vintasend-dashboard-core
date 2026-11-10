@@ -525,6 +525,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/{id}/requeue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Requeue a failed or cancelled notification
+         * @description Puts a `FAILED` or `CANCELLED` notification back into `PENDING_SEND`.
+         *     The notification keeps its ID, content and template pin, so this
+         *     retries the same notification, where `resend` creates a new one. When
+         *     it is due (`sendAfter` is `null` or in the past) it is sent right away,
+         *     so the returned notification may already be stale. Backends that
+         *     delete cancelled notifications only requeue failed ones.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["notificationId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * Format: date-time
+                         * @description When to send it. Omitted, the notification keeps its own
+                         *     `sendAfter`; `null` sends it as soon as it is requeued.
+                         */
+                        sendAfter?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description The notification as it stands after being requeued. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Notification"];
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                /**
+                 * @description The notification is not in `FAILED` or `CANCELLED` status
+                 *     (`CONFLICT`).
+                 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/repin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pin a notification to a template version
+         * @description Sets `requestedTemplateVersion`, by default to the version the
+         *     template renderer reports as current. Use it after publishing a fixed
+         *     template to move notifications that have not been delivered onto it.
+         *     Allowed in `PENDING_SEND`, `FAILED` and `CANCELLED`. It neither sends
+         *     nor changes the status; requeue a failed notification afterwards.
+         *     Repinning to the version already pinned changes nothing.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["notificationId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @description Pin this version instead of the current one. It is not
+                         *     checked against the template source.
+                         */
+                        templateVersion?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description The notification with its new pin. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: components["schemas"]["Notification"];
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
+                /**
+                 * @description The notification was already delivered (`SENT` or `READ`), or no
+                 *     version was given and the template renderer reports none
+                 *     (`CONFLICT`).
+                 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {

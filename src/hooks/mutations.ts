@@ -6,7 +6,8 @@
  * Variables keep the generated shape — `{ params: { path: { id } }, body }` —
  * because that is what stays correct as `openapi.yaml` changes. What these add
  * over the raw client is cache invalidation: a resend creates a notification
- * and a cancel changes one, so both make every notification list stale, and
+ * and a cancel, requeue or repin changes one, so each makes every notification
+ * list stale, and
  * forgetting to invalidate is the usual way a dashboard ends up showing a row
  * it just changed in its old state.
  */
@@ -70,14 +71,17 @@ export function useResendNotification(options: MutationHookOptions = {}) {
  * cancel.mutate({ params: { path: { id } } });
  * ```
  */
-export function useCancelNotification(options: MutationHookOptions = {}) {
+/**
+ * Invalidates every notification list, then the changed notification's own
+ * detail and preview, which are stale too.
+ */
+function useInvalidateNotificationAndLists() {
   const invalidateLists = useInvalidateNotifications();
   const queryClient = useQueryClient();
 
-  const invalidate = async (...args: unknown[]) => {
+  return async (...args: unknown[]) => {
     await invalidateLists();
 
-    // The cancelled notification's own detail and preview are stale too.
     const variables = args[1] as { params?: { path?: { id?: string } } } | undefined;
     const id = variables?.params?.path?.id;
 
@@ -87,10 +91,63 @@ export function useCancelNotification(options: MutationHookOptions = {}) {
       });
     }
   };
+}
+
+/**
+ * Cancels a notification that is still `PENDING_SEND`.
+ *
+ * ```ts
+ * const cancel = useCancelNotification();
+ * cancel.mutate({ params: { path: { id } } });
+ * ```
+ */
+export function useCancelNotification(options: MutationHookOptions = {}) {
+  const invalidate = useInvalidateNotificationAndLists();
 
   return useVintaSendApi(options).useMutation(
     'post',
     '/api/v1/notifications/{id}/cancel',
+    withInvalidation(options.mutation, invalidate),
+  );
+}
+
+/**
+ * Puts a `FAILED` or `CANCELLED` notification back into `PENDING_SEND`. It keeps
+ * its ID, unlike a resend, and is sent at once when due. Omit `sendAfter` to
+ * keep the notification's own; `null` means now. Any other status answers 409.
+ *
+ * ```ts
+ * const requeue = useRequeueNotification();
+ * requeue.mutate({ params: { path: { id } }, body: { sendAfter: null } });
+ * ```
+ */
+export function useRequeueNotification(options: MutationHookOptions = {}) {
+  const invalidate = useInvalidateNotificationAndLists();
+
+  return useVintaSendApi(options).useMutation(
+    'post',
+    '/api/v1/notifications/{id}/requeue',
+    withInvalidation(options.mutation, invalidate),
+  );
+}
+
+/**
+ * Pins a notification that has not been delivered to a template version: the
+ * current one when `templateVersion` is omitted. Sends nothing; requeue a
+ * failed notification afterwards. A delivered notification, or a template with
+ * no versions, answers 409.
+ *
+ * ```ts
+ * const repin = useRepinNotification();
+ * repin.mutate({ params: { path: { id } }, body: {} });
+ * ```
+ */
+export function useRepinNotification(options: MutationHookOptions = {}) {
+  const invalidate = useInvalidateNotificationAndLists();
+
+  return useVintaSendApi(options).useMutation(
+    'post',
+    '/api/v1/notifications/{id}/repin',
     withInvalidation(options.mutation, invalidate),
   );
 }

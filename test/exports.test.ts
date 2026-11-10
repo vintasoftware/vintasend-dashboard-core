@@ -25,6 +25,8 @@ const EXPECTED_EXPORTS = [
   'useInvalidateNotifications',
   'useResendNotification',
   'useCancelNotification',
+  'useRequeueNotification',
+  'useRepinNotification',
   'useFilteredNotifications',
   'useNotificationFilters',
   'useHistoryRouterAdapter',
