@@ -194,6 +194,8 @@ differently; `setFilter` writes immediately.
 | `useHealth()` | `GET /health` |
 | `useResendNotification()` | `POST /api/v1/notifications/{id}/resend` |
 | `useCancelNotification()` | `POST /api/v1/notifications/{id}/cancel` |
+| `useRequeueNotification()` | `POST /api/v1/notifications/{id}/requeue` |
+| `useRepinNotification()` | `POST /api/v1/notifications/{id}/repin` |
 
 `useNotification` and `useNotificationPreview` stay idle while the id is
 `null`, which is what a detail panel that is not open yet wants.
@@ -207,6 +209,13 @@ resend.mutate({ params: { path: { id } }, body: { useStoredContext: true } });
 
 const cancel = useCancelNotification();
 cancel.mutate({ params: { path: { id } } });
+
+// Retry a failed notification after publishing a fixed template: pin it to the
+// current version, then put it back in the queue.
+const repin = useRepinNotification();
+const requeue = useRequeueNotification();
+await repin.mutateAsync({ params: { path: { id } }, body: {} });
+await requeue.mutateAsync({ params: { path: { id } }, body: {} });
 ```
 
 Anything not named above is still reachable, fully typed, through the raw

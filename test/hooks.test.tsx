@@ -3,7 +3,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createVintaSendClient, type VintaSendClient } from '../src/api/query.js';
-import { useCancelNotification, useResendNotification } from '../src/hooks/mutations.js';
+import {
+  useCancelNotification,
+  useRepinNotification,
+  useRequeueNotification,
+  useResendNotification,
+} from '../src/hooks/mutations.js';
 import {
   supportsCapability,
   useFilterCapabilities,
@@ -89,9 +94,13 @@ function createStubApi(
           ? routes.__resend
           : /^\/api\/v1\/notifications\/[^/]+\/cancel$/.test(url.pathname)
             ? routes.__cancel
-            : /^\/api\/v1\/notifications\/[^/]+$/.test(url.pathname)
-              ? routes.__detail
-              : undefined);
+            : /^\/api\/v1\/notifications\/[^/]+\/requeue$/.test(url.pathname)
+              ? routes.__requeue
+              : /^\/api\/v1\/notifications\/[^/]+\/repin$/.test(url.pathname)
+                ? routes.__repin
+                : /^\/api\/v1\/notifications\/[^/]+$/.test(url.pathname)
+                  ? routes.__detail
+                  : undefined);
 
     if (!handler) {
       return new Response(
@@ -320,6 +329,43 @@ describe('mutations', () => {
         requests.filter((u) => u.pathname === '/api/v1/notifications/n1').length,
       ).toBeGreaterThan(detailCallsBefore),
     );
+  });
+});
+
+describe('requeue and repin', () => {
+  it.each([
+    ['requeue', '__requeue', { sendAfter: null }],
+    ['repin', '__repin', {}],
+  ] as const)('%s refetches the lists and the notification detail', async (action, route, body) => {
+    const { wrapper, requests } = setup({
+      __detail: () => ({ body: { data: { ...notification('n1'), attachments: [] } } }),
+      [route]: () => ({ body: { data: { ...notification('n1'), status: 'PENDING_SEND' } } }),
+    });
+
+    const { result } = renderHook(
+      () => ({
+        list: useNotificationsQuery({ page: 1, pageSize: 20 }),
+        detail: useNotification('n1'),
+        requeue: useRequeueNotification(),
+        repin: useRepinNotification(),
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.list.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.detail.isSuccess).toBe(true));
+
+    const count = (pathname: string) => requests.filter((u) => u.pathname === pathname).length;
+    const listBefore = count('/api/v1/notifications');
+    const detailBefore = count('/api/v1/notifications/n1');
+
+    await act(async () => {
+      await result.current[action].mutateAsync({ params: { path: { id: 'n1' } }, body });
+    });
+
+    expect(count(`/api/v1/notifications/n1/${action}`)).toBe(1);
+    await waitFor(() => expect(count('/api/v1/notifications')).toBeGreaterThan(listBefore));
+    await waitFor(() => expect(count('/api/v1/notifications/n1')).toBeGreaterThan(detailBefore));
   });
 });
 

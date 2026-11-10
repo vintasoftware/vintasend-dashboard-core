@@ -106,6 +106,8 @@ export {
 export {
   type MutationHookOptions,
   useCancelNotification,
+  useRepinNotification,
+  useRequeueNotification,
   useResendNotification,
 } from './hooks/mutations.js';
 // Query hooks
