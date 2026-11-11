@@ -40,6 +40,7 @@ const EXPECTED_EXPORTS = [
   'hasActiveFilters',
   'toSearchParams',
   'isApiErrorResponse',
+  'getActionRefusalReason',
   'getApiErrorCode',
   'getApiErrorMessage',
   'toApiErrorResponse',

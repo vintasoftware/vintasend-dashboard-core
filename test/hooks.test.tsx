@@ -248,6 +248,21 @@ describe('capabilities', () => {
   it('assumes support before the capabilities have loaded', () => {
     expect(supportsCapability(undefined, 'orderBy.sentAt')).toBe(true);
   });
+
+  it.each([
+    'repin.expectedVersion',
+    'requeue.expectedVersion',
+    'requeue.templateVersion',
+    'versions.filter',
+  ])('treats an absent %s as unsupported, as an older API sends none', (key) => {
+    expect(supportsCapability({ 'orderBy.sentAt': true }, key)).toBe(false);
+    expect(supportsCapability(undefined, key)).toBe(false);
+  });
+
+  it('reads an action key the API reports', () => {
+    expect(supportsCapability({ 'versions.filter': true }, 'versions.filter')).toBe(true);
+    expect(supportsCapability({ 'versions.filter': false }, 'versions.filter')).toBe(false);
+  });
 });
 
 describe('mutations', () => {

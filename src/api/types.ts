@@ -30,10 +30,69 @@ export type ErrorResponse = Schemas['ErrorResponse'];
 export type ApiErrorCode = ErrorResponse['error']['code'];
 
 /**
- * Filter capabilities advertised by the configured backend, as flat dotted keys
- * (`orderBy.sentAt`, `stringLookups.includes`). A missing key means "supported".
+ * Capabilities advertised by the configured backend, as flat dotted keys
+ * (`orderBy.sentAt`, `stringLookups.includes`). For filter and ordering keys a
+ * missing key means "supported". The action keys
+ * ({@link NotificationActionCapability}) are always present and explicit.
  */
 export type FilterCapabilities = Record<string, boolean>;
+
+/**
+ * The optional notification actions `/api/v1/capabilities` always reports,
+ * `true` or `false`. Gate the matching affordance on them: `expectedVersion`
+ * on requeue and repin, `templateVersion` on requeue, and the versions search.
+ */
+export type NotificationActionCapability =
+  | 'repin.expectedVersion'
+  | 'requeue.expectedVersion'
+  | 'requeue.templateVersion'
+  | 'versions.filter';
+
+/**
+ * Why the API refused a requeue, a repin or a versions search, from the error's
+ * `details.reason`. `CHANGED` means the notification moved on since it was
+ * listed: list it again rather than retry.
+ */
+export type NotificationActionRefusalReason =
+  | 'NOT_FOUND'
+  | 'INVALID_STATUS'
+  | 'NO_TEMPLATE_VERSION'
+  | 'CHANGED'
+  | 'UNSUPPORTED';
+
+type VersionsSearchOperation = paths['/api/v1/notifications/versions']['post'];
+
+/**
+ * A filter for `POST /api/v1/notifications/versions`: a set of fields (ANDed),
+ * or `{ and }`, `{ or }`, `{ not }` around more filters.
+ */
+export type NotificationSearchFilter = Schemas['NotificationSearchFilter'];
+/** The fields of one {@link NotificationSearchFilter} leaf. */
+export type NotificationSearchFilterFields = Schemas['NotificationSearchFilterFields'];
+/** An ISO-8601 date range, either end optional. */
+export type DateRange = Schemas['DateRange'];
+
+/** Body of `POST /api/v1/notifications/versions`. */
+export type NotificationVersionsSearch = NonNullable<
+  VersionsSearchOperation['requestBody']
+>['content']['application/json'];
+/** A page of `POST /api/v1/notifications/versions`. */
+export type NotificationVersionsPage =
+  VersionsSearchOperation['responses'][200]['content']['application/json'];
+/**
+ * One row of the versions search: an ID and an opaque version token to pass
+ * back as `expectedVersion`.
+ */
+export type NotificationVersionEntry = NotificationVersionsPage['data'][number];
+
+/** Body of `POST /api/v1/notifications/{id}/requeue`. */
+export type RequeueNotificationBody = NonNullable<
+  paths['/api/v1/notifications/{id}/requeue']['post']['requestBody']
+>['content']['application/json'];
+/** Body of `POST /api/v1/notifications/{id}/repin`. */
+export type RepinNotificationBody = NonNullable<
+  paths['/api/v1/notifications/{id}/repin']['post']['requestBody']
+>['content']['application/json'];
 
 /** Payload of `POST /api/v1/notifications/{id}/cancel` on success. */
 export type CancelledNotification = {

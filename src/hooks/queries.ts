@@ -16,7 +16,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { VintaSendClient, VintaSendQueryClient } from '../api/query.js';
-import type { FilterCapabilities, NotificationListQuery } from '../api/types.js';
+import type {
+  FilterCapabilities,
+  NotificationActionCapability,
+  NotificationListQuery,
+} from '../api/types.js';
 import { useVintaSendClient } from '../provider.js';
 
 export type WithClient = {
@@ -152,15 +156,26 @@ export function useHealth(options: WithClient & { query?: QueryOptions } = {}) {
   return useVintaSendApi(options).useQuery('get', '/health', {}, options.query);
 }
 
+const ACTION_CAPABILITIES: readonly string[] = [
+  'repin.expectedVersion',
+  'requeue.expectedVersion',
+  'requeue.templateVersion',
+  'versions.filter',
+] satisfies readonly NotificationActionCapability[];
+
 /**
- * Reads a capability the way the API documents it: absent means supported.
- * `capabilities` is the payload of `useFilterCapabilities`.
+ * Reads a capability the way the API documents it. A filter or ordering key
+ * that is absent means supported. An action key
+ * ({@link NotificationActionCapability}) that is absent means unsupported: an
+ * API that predates it does not send it, and cannot do it. `capabilities` is
+ * the payload of `useFilterCapabilities`; while it is loading, action keys read
+ * `false` too.
  */
 export function supportsCapability(
   capabilities: FilterCapabilities | undefined,
   key: string,
 ): boolean {
-  return capabilities?.[key] ?? true;
+  return capabilities?.[key] ?? !ACTION_CAPABILITIES.includes(key);
 }
 
 /**

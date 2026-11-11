@@ -231,11 +231,48 @@ const { data } = api.useQuery('get', '/api/v1/notifications/{id}', {
 ## Capabilities
 
 Backends differ in what they can filter and sort by. `GET /api/v1/capabilities`
-reports the gaps, and a **missing key means supported**:
+reports the gaps, and for filter and ordering keys a **missing key means
+supported**:
 
 ```tsx
 const { data } = useFilterCapabilities();
 const canSortBySentAt = supportsCapability(data?.data, 'orderBy.sentAt');
+```
+
+The four action keys (`NotificationActionCapability`: `repin.expectedVersion`,
+`requeue.expectedVersion`, `requeue.templateVersion`, `versions.filter`) work the
+other way: the API always sends them, and `supportsCapability` reads one that is
+missing — from an older API, or before the query loads — as **unsupported**.
+
+## Moving notifications safely
+
+`POST /api/v1/notifications/versions` lists IDs and version tokens without reading
+the notifications. Every type it and the requeue/repin options use is exported:
+`NotificationVersionsSearch`, `NotificationSearchFilter`,
+`NotificationSearchFilterFields`, `DateRange`, `NotificationVersionsPage`,
+`NotificationVersionEntry`, `RequeueNotificationBody` and `RepinNotificationBody`.
+
+```tsx
+const api = useVintaSendApi();
+const versions = api.useMutation('post', '/api/v1/notifications/versions');
+const requeue = useRequeueNotification();
+
+const page = await versions.mutateAsync({
+  body: { filter: { bodyTemplate: 'welcome', status: 'FAILED' }, pageSize: 500 },
+});
+for (const { id, version } of page.data) {
+  await requeue.mutateAsync({
+    params: { path: { id } },
+    body: { templateVersion: 4, expectedVersion: version, send: false },
+  });
+}
+```
+
+A refused requeue, repin or search carries a reason; `CHANGED` means the
+notification moved on since it was listed, so list again rather than retry:
+
+```tsx
+if (getActionRefusalReason(error) === 'CHANGED') refetchVersions();
 ```
 
 ## Errors

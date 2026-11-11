@@ -25,6 +25,7 @@ export {
 } from './api/client.js';
 // Errors
 export {
+  getActionRefusalReason,
   getApiErrorCode,
   getApiErrorMessage,
   isApiErrorResponse,
@@ -42,9 +43,12 @@ export type {
   ApiErrorCode,
   CancelledNotification,
   components,
+  DateRange,
   ErrorResponse,
   FilterCapabilities,
   Notification,
+  NotificationActionCapability,
+  NotificationActionRefusalReason,
   NotificationAttachment,
   NotificationDetail,
   NotificationFilters,
@@ -52,11 +56,18 @@ export type {
   NotificationOrderByField,
   NotificationOrderDirection,
   NotificationPreview,
+  NotificationSearchFilter,
+  NotificationSearchFilterFields,
   NotificationStatus,
   NotificationType,
+  NotificationVersionEntry,
+  NotificationVersionsPage,
+  NotificationVersionsSearch,
   OneOffNotification,
   PaginatedNotifications,
   paths,
+  RepinNotificationBody,
+  RequeueNotificationBody,
   UserNotification,
 } from './api/types.js';
 export {

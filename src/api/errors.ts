@@ -8,7 +8,7 @@
  * (a network failure, an HTML error page from a proxy) into the same envelope.
  */
 
-import type { ApiErrorCode, ErrorResponse } from './types.js';
+import type { ApiErrorCode, ErrorResponse, NotificationActionRefusalReason } from './types.js';
 
 /**
  * Every code the contract defines. `FORBIDDEN` means the caller is signed in
@@ -64,6 +64,33 @@ export function isApiErrorResponse(value: unknown): value is ErrorResponse {
  */
 export function getApiErrorCode(error: unknown): ApiErrorCode | undefined {
   return isApiErrorResponse(error) ? error.error.code : undefined;
+}
+
+const ACTION_REFUSAL_REASONS = [
+  'NOT_FOUND',
+  'INVALID_STATUS',
+  'NO_TEMPLATE_VERSION',
+  'CHANGED',
+  'UNSUPPORTED',
+] as const satisfies readonly NotificationActionRefusalReason[];
+
+/**
+ * Why a requeue, repin or versions search was refused, from the error's
+ * `details.reason`, or `undefined` for any other failure. `CHANGED` means the
+ * notification moved on since it was listed: list it again rather than retry.
+ */
+export function getActionRefusalReason(
+  error: unknown,
+): NotificationActionRefusalReason | undefined {
+  if (!isApiErrorResponse(error)) {
+    return undefined;
+  }
+  const details = error.error.details;
+  if (typeof details !== 'object' || details === null || !('reason' in details)) {
+    return undefined;
+  }
+  const { reason } = details as { reason: unknown };
+  return ACTION_REFUSAL_REASONS.find((known) => known === reason);
 }
 
 /**
