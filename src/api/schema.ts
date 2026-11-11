@@ -64,6 +64,11 @@ export interface paths {
          *     namespace, which reports how the backend numbers its pages — are filtered
          *     out, because the API's own `page` parameter is 1-indexed either way and a
          *     client that saw them might convert a second time.
+         *
+         *     The map also carries the backend's optional notification actions, always
+         *     all four and always explicit, because for these a missing key would mean
+         *     "unsupported": `repin.expectedVersion`, `requeue.expectedVersion`,
+         *     `requeue.templateVersion` and `versions.filter`.
          */
         get: {
             parameters: {
@@ -540,8 +545,8 @@ export interface paths {
          *     The notification keeps its ID, content and template pin, so this
          *     retries the same notification, where `resend` creates a new one. When
          *     it is due (`sendAfter` is `null` or in the past) it is sent right away,
-         *     so the returned notification may already be stale. Backends that
-         *     delete cancelled notifications only requeue failed ones.
+         *     unless `send` is `false`. Backends that delete cancelled notifications
+         *     only requeue failed ones.
          */
         post: {
             parameters: {
@@ -561,11 +566,32 @@ export interface paths {
                          *     `sendAfter`; `null` sends it as soon as it is requeued.
                          */
                         sendAfter?: string | null;
+                        /**
+                         * @description Pin this template version in the same write that requeues
+                         *     it. Needs `requeue.templateVersion` in `/capabilities`.
+                         */
+                        templateVersion?: number;
+                        /**
+                         * @description Requeue only if the notification is still at this version,
+                         *     the token `POST /api/v1/notifications/versions` returned for
+                         *     it. Needs `requeue.expectedVersion`.
+                         */
+                        expectedVersion?: string;
+                        /**
+                         * @description `false` leaves the notification pending for whatever sends
+                         *     pending notifications, even when it is due. Defaults to
+                         *     `true`.
+                         */
+                        send?: boolean;
                     };
                 };
             };
             responses: {
-                /** @description The notification as it stands after being requeued. */
+                /**
+                 * @description The notification as it stands after any send the request started:
+                 *     `SENT` when it went out, `FAILED` when the adapter failed,
+                 *     `PENDING_SEND` when it is waiting.
+                 */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -581,8 +607,11 @@ export interface paths {
                 403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
                 /**
-                 * @description The notification is not in `FAILED` or `CANCELLED` status
-                 *     (`CONFLICT`).
+                 * @description Refused (`CONFLICT`), with `details.reason`: `INVALID_STATUS` when
+                 *     the notification is not `FAILED` or `CANCELLED`, `CHANGED` when it
+                 *     is no longer at `expectedVersion`, `UNSUPPORTED` when the backend
+                 *     cannot honour `templateVersion`, `expectedVersion` or `send`.
+                 *     Nothing is written.
                  */
                 409: {
                     headers: {
@@ -615,8 +644,9 @@ export interface paths {
          *     template renderer reports as current. Use it after publishing a fixed
          *     template to move notifications that have not been delivered onto it.
          *     Allowed in `PENDING_SEND`, `FAILED` and `CANCELLED`. It neither sends
-         *     nor changes the status; requeue a failed notification afterwards.
-         *     Repinning to the version already pinned changes nothing.
+         *     nor changes the status; to pin and requeue a failed notification in
+         *     one write, pass `templateVersion` to requeue instead. Repinning to the
+         *     version already pinned changes nothing.
          */
         post: {
             parameters: {
@@ -635,6 +665,11 @@ export interface paths {
                          *     checked against the template source.
                          */
                         templateVersion?: number;
+                        /**
+                         * @description Repin only if the notification is still at this version.
+                         *     Needs `repin.expectedVersion` in `/capabilities`.
+                         */
+                        expectedVersion?: string;
                     };
                 };
             };
@@ -655,9 +690,129 @@ export interface paths {
                 403: components["responses"]["Forbidden"];
                 404: components["responses"]["NotFound"];
                 /**
-                 * @description The notification was already delivered (`SENT` or `READ`), or no
-                 *     version was given and the template renderer reports none
-                 *     (`CONFLICT`).
+                 * @description Refused (`CONFLICT`), with `details.reason`: `INVALID_STATUS` when
+                 *     the notification was already delivered, `NO_TEMPLATE_VERSION` when
+                 *     no version was given and the renderer reports none, `CHANGED` when
+                 *     it is no longer at `expectedVersion`, `UNSUPPORTED` when the
+                 *     backend cannot check `expectedVersion`. Nothing is written.
+                 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find notifications by ID and version, without their content
+         * @description Returns `{ id, version }` for every notification matching `filter`,
+         *     ordered by ID, and nothing else: the backend reads no recipient,
+         *     context or rendered content to answer. Use it to count or select
+         *     notifications, then pass `version` as `expectedVersion` to requeue or
+         *     repin each one only if it has not changed since.
+         *
+         *     `filter` is VintaSend's composable filter: a set of fields (ANDed), or
+         *     `{ and: [...] }`, `{ or: [...] }`, `{ not: ... }`, nesting at most six
+         *     levels. Strings match exactly and dates are ISO-8601. A filter the
+         *     backend reports it cannot run (see `/capabilities`) is a 400 naming
+         *     what it cannot do.
+         *
+         *     Requeuing or repinning what this returns changes what matches, so list
+         *     again from page 1 rather than moving on to the next page.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    /**
+                     * @example {
+                     *       "filter": {
+                     *         "and": [
+                     *           {
+                     *             "bodyTemplate": "welcome"
+                     *           },
+                     *           {
+                     *             "or": [
+                     *               {
+                     *                 "and": [
+                     *                   {
+                     *                     "status": "PENDING_SEND",
+                     *                     "hasSendAfter": true,
+                     *                     "hasRequestedTemplateVersion": true
+                     *                   },
+                     *                   {
+                     *                     "not": {
+                     *                       "requestedTemplateVersion": 4
+                     *                     }
+                     *                   }
+                     *                 ]
+                     *               },
+                     *               {
+                     *                 "status": "FAILED"
+                     *               }
+                     *             ]
+                     *           }
+                     *         ]
+                     *       }
+                     *     }
+                     */
+                    "application/json": {
+                        filter?: components["schemas"]["NotificationSearchFilter"];
+                        /** @default 1 */
+                        page?: number;
+                        /** @default 100 */
+                        pageSize?: number;
+                    };
+                };
+            };
+            responses: {
+                /** @description One page of IDs and version tokens. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            data: {
+                                id: string;
+                                /** @description Opaque; compare for equality only. */
+                                version: string;
+                            }[];
+                            page: number;
+                            pageSize: number;
+                            hasMore: boolean;
+                        };
+                    };
+                };
+                400: components["responses"]["BadRequest"];
+                401: components["responses"]["Unauthorized"];
+                403: components["responses"]["Forbidden"];
+                /**
+                 * @description The backend cannot list notification versions (`CONFLICT`, with
+                 *     `details.reason` `UNSUPPORTED`).
                  */
                 409: {
                     headers: {
@@ -755,6 +910,43 @@ export interface components {
             attachments: components["schemas"]["NotificationAttachment"][];
         };
         NotificationDetail: (components["schemas"]["UserNotification"] & components["schemas"]["NotificationDetailFields"]) | (components["schemas"]["OneOffNotification"] & components["schemas"]["NotificationDetailFields"]);
+        /**
+         * @description A set of fields (ANDed), or a logical group. Strings match exactly;
+         *     dates are ISO-8601.
+         */
+        NotificationSearchFilter: {
+            and: components["schemas"]["NotificationSearchFilter"][];
+        } | {
+            or: components["schemas"]["NotificationSearchFilter"][];
+        } | {
+            not: components["schemas"]["NotificationSearchFilter"];
+        } | components["schemas"]["NotificationSearchFilterFields"];
+        NotificationSearchFilterFields: {
+            status?: components["schemas"]["NotificationStatus"] | components["schemas"]["NotificationStatus"][];
+            notificationType?: ("EMAIL" | "SMS" | "PUSH" | "IN_APP") | ("EMAIL" | "SMS" | "PUSH" | "IN_APP")[];
+            adapterUsed?: string | string[];
+            userId?: string;
+            bodyTemplate?: string;
+            subjectTemplate?: string;
+            contextName?: string;
+            tenant?: string | string[];
+            requestedTemplateVersion?: number | number[];
+            usedTemplateVersion?: number | number[];
+            /** @description `true`: has a send time; `false`: has none. */
+            hasSendAfter?: boolean;
+            /** @description `true`: pinned to some template version; `false`: unpinned. */
+            hasRequestedTemplateVersion?: boolean;
+            sendAfterRange?: components["schemas"]["DateRange"];
+            createdAtRange?: components["schemas"]["DateRange"];
+            sentAtRange?: components["schemas"]["DateRange"];
+            readAtRange?: components["schemas"]["DateRange"];
+        };
+        DateRange: {
+            /** Format: date-time */
+            from?: string;
+            /** Format: date-time */
+            to?: string;
+        };
         PaginatedNotifications: {
             data: components["schemas"]["Notification"][];
             page: number;
@@ -781,6 +973,10 @@ export interface components {
                 /**
                  * @description Optional machine-readable context. Every 400 carries `issues`, a
                  *     list of `{ path, message }`, and may carry other keys beside it.
+                 *     A refused requeue or repin, and a versions search the backend
+                 *     cannot run, carry `reason` (`INVALID_STATUS`,
+                 *     `NO_TEMPLATE_VERSION`, `CHANGED`, `UNSUPPORTED`, or `NOT_FOUND`
+                 *     on a 404).
                  */
                 details?: unknown;
             };
